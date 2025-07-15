@@ -87,27 +87,6 @@ debug() {
 	fi
 }
 
-function exec_print() {
-	if [ "$DEBUG" ];
-	then
-		echo ""
-		echo "[DEBUG EXEC]: $*"
-		eval "$@"
-	else
-		eval "$@" 2> /dev/null > /dev/null
-	fi
-}
-function exec_display_print() {
-	if [ "$DEBUG" ];
-	then
-		echo ""
-		echo "[DEBUG EXEC]: $*"
-		eval "$@"
-	else
-		eval "$@" 2> /dev/null
-	fi
-}
-
 function selection_test() {
 	_result=1
 	_select=$1
@@ -303,7 +282,9 @@ function generate_gpt_partition_table_from_flash_layout() {
 	new_next_partition_offset_b=0
 	number_of_partition=$( calculate_number_of_partition )
 
-	exec_print "sgdisk -og -a 1 $FLASHLAYOUT_rawname"
+	[ -v DEBUG ] && set -x
+	sgdisk -og -a 1 "$FLASHLAYOUT_rawname"
+	[ -v DEBUG ] && { set +x; } &> /dev/null
 
 	echo "Create partition table:"
 
@@ -523,7 +504,9 @@ function generate_gpt_partition_table_from_flash_layout() {
 				esac
 
 				printf "part %d: %8s ..." $j "$partName"
-				exec_print "sgdisk -a 1 -n $j:$offset:$next_offset -c $j:$partName -t $j:$gpt_code $extrafs_param $FLASHLAYOUT_rawname"
+				[ -v DEBUG ] && set -x
+				sgdisk -a 1 -n $j:$offset:$next_offset -c $j:$partName -t $j:$gpt_code $extrafs_param "$FLASHLAYOUT_rawname"
+				[ -v DEBUG ] && { set +x; } &> /dev/null
 				partition_size=$(sgdisk -p "$FLASHLAYOUT_rawname" | grep "$partName" | grep -v "\-$partName" | grep -v "First usable" | awk '{ print $4}')
 				partition_size_type=$(sgdisk -p "$FLASHLAYOUT_rawname" | grep "$partName" | grep -v "\-$partName" | grep -v "First usable" | awk '{ print $5}')
 				printf "\r[CREATED] part %02d: %10s [partition size %s %s]\n" $j "$partName"  "$partition_size" "$partition_size_type"
@@ -536,11 +519,15 @@ function generate_gpt_partition_table_from_flash_layout() {
 
 	echo ""
 	echo "Partition table from $FLASHLAYOUT_rawname"
-	exec_display_print "sgdisk -p $FLASHLAYOUT_rawname"
+	[ -v DEBUG ] && set -x
+	sgdisk -p "$FLASHLAYOUT_rawname"
+	[ -v DEBUG ] && { set +x; } &> /dev/null
 	for info in $display_info;
 	do
 		echo ""
-		exec_display_print "sgdisk $FLASHLAYOUT_rawname -i $info"
+		[ -v DEBUG ] && set -x
+		sgdisk "$FLASHLAYOUT_rawname" -i "$info"
+		[ -v DEBUG ] && { set +x; } &> /dev/null
 	done
 	echo ""
 }
@@ -548,7 +535,9 @@ function generate_gpt_partition_table_from_flash_layout() {
 function generate_empty_raw_image() {
 	# Initialize image file (due to bs we force seek on K)
 	echo "Create Raw empty image: $FLASHLAYOUT_rawname of ${DEFAULT_RAW_SIZE}MB"
-	exec_print "dd if=/dev/zero of=$FLASHLAYOUT_rawname bs=1024 count=0 seek=${DEFAULT_RAW_SIZE}K"
+	[ -v DEBUG ] && set -x
+	dd if="/dev/zero" of="$FLASHLAYOUT_rawname" bs=1024 count=0 seek="${DEFAULT_RAW_SIZE}K"
+	[ -v DEBUG ] && { set +x; } &> /dev/null
 }
 
 function populate_gpt_partition_table_from_flash_layout() {
@@ -586,7 +575,9 @@ function populate_gpt_partition_table_from_flash_layout() {
 				if [ -e "$FLASHLAYOUT_prefix_image_path/$bin2flash" ];
 				then
 					printf "part %02d: %10s, image: %s ..." $j "$partName" "$bin2flash"
-					exec_print "dd if=$FLASHLAYOUT_prefix_image_path/$bin2flash of=$FLASHLAYOUT_rawname conv=fdatasync,notrunc seek=1 bs=$offset"
+					[ -v DEBUG ] && set -x
+					dd if="$FLASHLAYOUT_prefix_image_path/$bin2flash" of="$FLASHLAYOUT_rawname" conv=fdatasync,notrunc seek=1 bs="$offset"
+					[ -v DEBUG ] && { set +x; } &> /dev/null
 					printf "\r[ FILLED ] part %02d: %10s, image: %s \n" $j "$partName" "$bin2flash"
 				else
 					if [ ! "$(basename $FLASHLAYOUT_prefix_image_path/"$bin2flash")" = "none" ];
@@ -932,7 +923,7 @@ function usage() {
 	echo "By setting SDCARD_SIZE on shell environment or calling the script with it you can limit the size of RAW sdcard"
 	echo "SDCARD_SIZE=<value on MB>"
 	echo "ex.: SDCARD_SIZE=2048 ./script/create_sdcard_from_flashlayout.sh <flashlayout>"
-	echo " this exemple limit the size of sdcard to 2GB (2048MB)"
+	echo " this example limit the size of sdcard to 2GB (2048MB)"
 	echo ""
 	echo "By setting DEVICE on shell environment or calling the script with it you can customize the command"
 	echo "ex.: DEVICE=sdb ./script/create_sdcard_from_flashlayout.sh <flashlayout>"
